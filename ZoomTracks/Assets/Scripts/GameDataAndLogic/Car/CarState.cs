@@ -3,6 +3,9 @@ using UnityEngine.InputSystem;
 
 namespace ZoomTracks {
     public class CarState {
+        private const float MaxDriftVisualIndicator_Degrees = 80f;
+        private const float MaxDriftSpeed_DegreesPerSecond = 45f;
+
         private Transform PlaceholderCarTransform { get; }
         private TrackSwitcher TrackSwitcher { get; }
         private CarSwitcher CarSwitcher { get; }
@@ -17,17 +20,25 @@ namespace ZoomTracks {
         /// <summary>
         /// World space
         /// </summary>
-        private float Rotation { get; set; }
-
-        /// <summary>
-        /// World space
-        /// </summary>
-        private Quaternion RotationQuaternion => Quaternion.Euler(0f, this.Rotation, 0f);
-
-        /// <summary>
-        /// World space
-        /// </summary>
         private Vector3 Velocity { get; set; }
+
+        private float PreviousRotation { get; set; }
+
+        private Quaternion RotationQuaternion {
+            get {
+                if (this.Velocity.sqrMagnitude <= 0f) {
+                    return Quaternion.Euler(0f, this.PreviousRotation, 0f);
+                } else {
+                    return Quaternion.LookRotation(this.Velocity, Vector3.up);
+                }
+            }
+        }
+
+        private float Rotation => this.RotationQuaternion.eulerAngles.y;
+
+        private float DriftInput { get; set; }
+
+        private float VisualRotation { get; set; }
 
         public CarState(Transform placeholderCarTransform, TrackSwitcher trackSwitcher, CarSwitcher carSwitcher, CameraController cameraController, InputManager inputManager) {
             this.PlaceholderCarTransform = placeholderCarTransform;
@@ -51,7 +62,7 @@ namespace ZoomTracks {
             CarDynamic carDynamic = this.CarSwitcher.CurrentCarDynamic;
             float cameraTransformEulerAngleY = this.CameraController.CameraYawWorldSpace;
 
-            if (brakeInput == 0) {
+            if (brakeInput <= 0) {
                 if (accelerationInput_xyPlane.magnitude > 0) {
                     Vector3 accelerationInput_xzPlane = new(accelerationInput_xyPlane.x, 0, accelerationInput_xyPlane.y);
                     Vector3 accelerationInput_worldSpace = Quaternion.Euler(0, cameraTransformEulerAngleY, 0) * accelerationInput_xzPlane;
@@ -82,7 +93,7 @@ namespace ZoomTracks {
                     // Brake and acceleration are zero, so do nothing
                 }
             } else {
-                if (this.Velocity == Vector3.zero) {
+                if (this.Velocity.sqrMagnitude <= 0f) {
                     // Brake is non-zero, but velocity is already zero, so do nothing
                 } else {
                     Vector3 opposingVec = (-1 * this.Velocity).normalized;
@@ -95,12 +106,49 @@ namespace ZoomTracks {
                 }
             }
 
-            if (carDynamic.VelocityLimiter >= 0) {
-                // Limit velocity
-                this.Velocity = Vector3.ClampMagnitude(this.Velocity, carDynamic.VelocityLimiter);
+            if (this.Velocity.sqrMagnitude > 0f) {
+                // Get drift input
+                Vector2 driftInput_xyPlane = gamepad.leftStick.ReadValue();
+                Vector3 driftInput_xzPlane = new(driftInput_xyPlane.x, 0f, driftInput_xyPlane.y);
+                Vector3 driftInput_worldSpace = Quaternion.Euler(0f, cameraTransformEulerAngleY, 0f) * driftInput_xzPlane;
+                Vector3 driftInput_carSpace = Quaternion.Inverse(this.RotationQuaternion) * driftInput_worldSpace;
+                float driftInput = driftInput_carSpace.x;
+                this.DriftInput = driftInput;
+                float driftDeltaAngle = MaxDriftSpeed_DegreesPerSecond * Time.deltaTime * driftInput;
+                this.Velocity = Quaternion.Euler(0f, driftDeltaAngle, 0f) * this.Velocity;
+            } else {
+                this.DriftInput = 0f;
+            }
+
+            if (this.Velocity.sqrMagnitude > 0f) {
+                this.PreviousRotation = this.Rotation;
+            }
+
+            // this.TranslationalDrift(gamepad, cameraTransformEulerAngleY);
+
+            //if (carDynamic.VelocityLimiter >= 0) {
+            //    // Limit velocity
+            //    this.Velocity = Vector3.ClampMagnitude(this.Velocity, carDynamic.VelocityLimiter);
+            //}
+        }
+
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0051:Remove unused private members", Justification = "<Pending>")]
+        private void TranslationalDrift(Gamepad gamepad, float cameraTransformEulerAngleY) {
+            if (this.Velocity.magnitude > 0f) {
+                // Get drift input
+                Vector2 driftInput_xyPlane = gamepad.leftStick.ReadValue();
+                Vector3 driftInput_xzPlane = new(driftInput_xyPlane.x, 0f, driftInput_xyPlane.y);
+                Vector3 driftInput_worldSpace = Quaternion.Euler(0f, cameraTransformEulerAngleY, 0f) * driftInput_xzPlane;
+                Vector3 driftInput_carSpace = Quaternion.Inverse(this.RotationQuaternion) * driftInput_worldSpace;
+                float driftInput = driftInput_carSpace.x;
+                float maxDriftSpeed_metersPerSecond = 10;
+                float driftDistance = driftInput * maxDriftSpeed_metersPerSecond * Time.deltaTime;
+                Vector3 unitLeft = (Quaternion.Euler(0f, 90f, 0f) * this.Velocity).normalized;
+                this.Position += unitLeft * driftDistance;
             }
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0051:Remove unused private members", Justification = "<Pending>")]
         private Vector3 PreventRotationJitter(Vector3 velocityDelta) {
             float minVelocityForRotation = this.CarSwitcher.CurrentCarDynamic.MinVelocityForRotation;
             if (minVelocityForRotation == 0) {
@@ -123,18 +171,25 @@ namespace ZoomTracks {
 
             if (this.Velocity != Vector3.zero) {
                 // Rotate to match the velocity direction
-                this.Rotation = Quaternion.LookRotation(this.Velocity, Vector3.up).eulerAngles.y;
+                this.VisualRotation = this.Rotation;
+
+                // Apply rotation offset based on drift input
+                this.VisualRotation += this.DriftInput * MaxDriftVisualIndicator_Degrees;
             }
         }
 
         public void ApplyStateToGameObject() {
-            this.CarSwitcher.CurrentCarTransform.SetPositionAndRotation(this.Position, this.RotationQuaternion);
+            this.CarSwitcher.CurrentCarTransform.SetPositionAndRotation(
+                this.Position,
+                Quaternion.Euler(0f, this.VisualRotation, 0f));
         }
 
         public void Reset() {
             this.Position = this.PlaceholderCarTransform.position;
-            this.Rotation = this.PlaceholderCarTransform.rotation.eulerAngles.y;
+            this.PreviousRotation = this.PlaceholderCarTransform.rotation.eulerAngles.y;
+            this.VisualRotation = this.PlaceholderCarTransform.rotation.eulerAngles.y;
             this.Velocity = Vector3.zero;
+            this.DriftInput = 0f;
         }
     }
 }
