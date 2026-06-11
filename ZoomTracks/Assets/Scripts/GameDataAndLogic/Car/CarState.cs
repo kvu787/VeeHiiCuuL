@@ -114,6 +114,8 @@ namespace ZoomTracks {
                 Vector3 driftInput_carSpace = Quaternion.Inverse(this.RotationQuaternion) * driftInput_worldSpace;
                 float driftInput = driftInput_carSpace.x;
                 this.DriftInput = driftInput;
+                // Unity uses left-handed system coordinates (as opposed to right-handed in Blender and Godot),
+                // so positive rotation about the positive Y-axis means clockwise rotation on the XZ plane.
                 float driftDeltaAngle = MaxDriftSpeed_DegreesPerSecond * Time.deltaTime * driftInput;
                 this.Velocity = Quaternion.Euler(0f, driftDeltaAngle, 0f) * this.Velocity;
             } else {
