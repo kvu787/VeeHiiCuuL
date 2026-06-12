@@ -134,6 +134,23 @@ namespace ZoomTracks {
             //}
         }
 
+        private Vector3 PreventRotationJitter(Vector3 deltaVelocity_worldSpace) {
+            //float minVelocityForRotation = this.CarSwitcher.CurrentCarDynamic.MinVelocityForRotation;
+            //if (minVelocityForRotation == 0) {
+            //    minVelocityForRotation = this.TrackSwitcher.CurrentTrackJson.MinVelocityForRotation;
+            //}
+
+            if (this.Velocity.magnitude < MinVelocityForRotation) {
+                Vector3 deltaVelocity_carSpace = Quaternion.Inverse(this.Rotation) * deltaVelocity_worldSpace;
+                deltaVelocity_carSpace.x = 0;
+                Vector3 newDeltaVelocity_worldSpace = this.Rotation * deltaVelocity_carSpace;
+                newDeltaVelocity_worldSpace.y = 0;
+                return newDeltaVelocity_worldSpace;
+            } else {
+                return deltaVelocity_worldSpace;
+            }
+        }
+
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0051:Remove unused private members", Justification = "<Pending>")]
         private void TranslationalDrift(Gamepad gamepad, float cameraTransformEulerAngleY) {
             if (this.Velocity.magnitude > 0f) {
