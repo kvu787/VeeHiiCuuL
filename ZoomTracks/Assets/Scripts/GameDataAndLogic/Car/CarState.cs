@@ -126,6 +126,19 @@ namespace ZoomTracks {
                 this.PreviousRotation = this.Rotation;
             }
 
+            //float deltaAngle_degrees = Vector3.Angle(previousVelocity, this.Velocity);
+            //float rotationSpeed = (deltaAngle_degrees / Time.deltaTime);
+            //if (rotationSpeed > MaxRotationSpeed_DegreesPerSecond) {
+            //    Debug.Log(rotationSpeed);
+            //}
+
+            // Uncomment this for standard angular speed clamping:
+            // this.Velocity = VectorUtility.ClampAngularSpeed(this.Rotation_Degrees, newVelocity: this.Velocity, MaxRotationSpeed_DegreesPerSecond);
+
+            //this.Velocity = VectorUtility.ClampAngularSpeed(this.Rotation_Degrees, newVelocity: this.Velocity, maxRotationSpeed_degreesPerSecond: 10f * this.Velocity.magnitude);
+            //this.Velocity = VectorUtility.ClampAngularSpeed(this.Rotation_Degrees, newVelocity: this.Velocity, maxRotationSpeed_degreesPerSecond: 100f * this.Velocity.magnitude);
+            //this.Velocity = VectorUtility.ClampAngularSpeed(this.Rotation_Degrees, newVelocity: this.Velocity, maxRotationSpeed_degreesPerSecond: 100f * this.Velocity.magnitude * this.Velocity.magnitude);            
+
             // this.TranslationalDrift(gamepad, cameraTransformEulerAngleY);
 
             //if (carDynamic.VelocityLimiter >= 0) {
